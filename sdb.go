@@ -64,7 +64,7 @@ func blobsHandler(w http.ResponseWriter, r *http.Request) {
 	res := []map[string]string{}
 	for _, i := range query.Items {
 		m := map[string]string{
-			"name": i.Name,
+			"hash": i.Name,
 		}
 		for _, attr := range i.Attrs {
 			m[attr.Name] = attr.Value
@@ -72,7 +72,7 @@ func blobsHandler(w http.ResponseWriter, r *http.Request) {
 		res = append(res, m)
 	}
 	WriteJSON(w, map[string]interface{}{
-		"data":  res,
+		"blobs": res,
 		"start": start,
 		"end":   end,
 	})
@@ -81,7 +81,6 @@ func blobsHandler(w http.ResponseWriter, r *http.Request) {
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST":
-		//parse the multipart form in the request
 		mr, err := r.MultipartReader()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
