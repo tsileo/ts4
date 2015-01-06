@@ -13,6 +13,7 @@ import (
 	"github.com/goamz/goamz/aws"
 	lsdb "github.com/goamz/goamz/exp/sdb"
 	ls3 "github.com/goamz/goamz/s3"
+	"github.com/gorilla/mux"
 )
 
 var (
@@ -20,6 +21,10 @@ var (
 	domain *lsdb.Domain
 	bucket *ls3.Bucket
 )
+
+func addSlash(s string) string {
+	return s[0:2] + "/" + s[2:40]
+}
 
 func WriteJSON(w http.ResponseWriter, data interface{}) {
 	js, err := json.Marshal(data)
@@ -31,6 +36,16 @@ func WriteJSON(w http.ResponseWriter, data interface{}) {
 	w.Write(js)
 }
 
+func blobHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	blob, err := bucket.Get(addSlash(vars["hash"]))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(blob)
+
+}
 func blobsHandler(w http.ResponseWriter, r *http.Request) {
 	start := r.URL.Query().Get("start")
 	if start == "" {
@@ -40,7 +55,7 @@ func blobsHandler(w http.ResponseWriter, r *http.Request) {
 	if end == "" {
 		end = time.Now().UTC().Format(time.RFC3339Nano)
 	}
-	query, err := sdb.Select(fmt.Sprintf("SELECT * FROM s3indextest2 where time > '%s' and time <= '%s' order by time asc", start, end), false)
+	query, err := sdb.Select(fmt.Sprintf("SELECT * FROM s3indextest4 where time > '%s' and time <= '%s' order by time asc", start, end), false)
 	if err != nil {
 		log.Printf("err:%v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -85,7 +100,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			hash := part.FormName()
 			var data bytes.Buffer
 			data.ReadFrom(part)
-			if err := bucket.Put(hash, data.Bytes(), "", ls3.Private, ls3.Options{}); err != nil {
+			if err := bucket.Put(addSlash(hash), data.Bytes(), "", ls3.Private, ls3.Options{}); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -109,24 +124,19 @@ func main() {
 	}
 	sdb = lsdb.New(auth, aws.USEast)
 	s3 := ls3.New(auth, aws.USEast)
-	domain = sdb.Domain("s3indextest2")
+	domain = sdb.Domain("s3indextest4")
 	if _, err := domain.CreateDomain(); err != nil {
 		panic(err)
 	}
-	bucket = s3.Bucket("thomassileo.s3indextexst")
+	bucket = s3.Bucket("thomassileo.s3indextexst2")
 	if err := bucket.PutBucket(ls3.Private); err != nil {
 		panic(err)
 	}
-	//r, err := sdb.Select("SELECT * FROM s3indextest2 where time > '2010' order by time asc", false)
-	//log.Printf("%+v, %+v", r, err)
-	//i := d.Item("ok")
-	//pa := &lsdb.PutAttrs{}
-	//pa.Add("a", "b")
-	//r2, err := i.PutAttrs(pa)
-	//r2, err := i.Attrs(nil, false)
-	//log.Printf("%v, %v", r2, err)
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	http.HandleFunc("/api/blobs", blobsHandler)
-	http.HandleFunc("/api/upload", uploadHandler)
+	r := mux.NewRouter()
+	r.HandleFunc("/api/blobs", blobsHandler)
+	r.HandleFunc("/api/blob/{hash}", blobHandler)
+	r.HandleFunc("/api/upload", uploadHandler)
+	http.Handle("/", r)
 	http.ListenAndServe(":8010", nil)
 }
