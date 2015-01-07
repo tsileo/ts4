@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -99,7 +100,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			hash := part.FormName()
 			var data bytes.Buffer
 			data.ReadFrom(part)
-			if err := bucket.Put(addSlash(hash), data.Bytes(), "", ls3.Private, ls3.Options{}); err != nil {
+			blob := data.Bytes()
+			computedHash := fmt.Sprintf("%x", sha1.Sum(blob))
+			if hash != computedHash {
+				http.Error(w, "hash don't match", http.StatusInternalServerError)
+			}
+			if err := bucket.Put(addSlash(hash), blob, "", ls3.Private, ls3.Options{}); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -123,6 +129,7 @@ func main() {
 	}
 	sdb = lsdb.New(auth, aws.USEast)
 	s3 := ls3.New(auth, aws.USEast)
+	// TODO env variable for domain and bucket and dont forget to update the select
 	domain = sdb.Domain("s3indextest4")
 	if _, err := domain.CreateDomain(); err != nil {
 		panic(err)
