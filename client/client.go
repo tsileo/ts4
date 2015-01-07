@@ -43,21 +43,24 @@ type BlobInfo struct {
 	Time string `json:"time"`
 }
 
-// Query send all blobs from start to end over the blobs channel,
+type QueryResp struct {
+	Blobs []*BlobInfo `json:"blobs"`
+	Start string      `json:"start"`
+	End   string      `json:"end"`
+}
+
+// Iter sends all blobs from start to end over the blobs channel,
 // start default to 0 and end to time.Now().UTC() if left empty.
-func (bs *BlobStore) Query(start, end string, blobs chan<- []byte) error {
-	//TODO(tsileo)
-	// In a for loop decode json from /blobs into []*BlobInfo
-	// and send them over the channel, make as many requests as necessary under the hood
+func (bs *BlobStore) Iter(start, end string, blobs chan<- []byte) error {
 	for {
-		res, err := bs.query(start, end)
+		res, err := bs.Query(start, end)
 		if err != nil {
 			return err
 		}
-		if len(res) == 0 {
+		if len(res.Blobs) == 0 {
 			break
 		}
-		for _, blobinfo := range res {
+		for _, blobinfo := range res.Blobs {
 			start = blobinfo.Time
 			blob, err := bs.Get(blobinfo.Hash)
 			if err != nil {
@@ -69,7 +72,9 @@ func (bs *BlobStore) Query(start, end string, blobs chan<- []byte) error {
 	return nil
 }
 
-func (bs *BlobStore) query(start, end string) ([]*BlobInfo, error) {
+// Query returns a QueryResp containing blobs hash and time.
+// start default to 0 and end to time.Now().UTC() if left empty.
+func (bs *BlobStore) Query(start, end string) (*QueryResp, error) {
 	request, err := http.NewRequest("GET", bs.ServerAddr+"/blobs?start="+start+"&end="+end, nil)
 	if err != nil {
 		return nil, err
@@ -79,7 +84,7 @@ func (bs *BlobStore) query(start, end string) ([]*BlobInfo, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	res := []*BlobInfo{}
+	res := &QueryResp{}
 	if err := json.NewDecoder(resp.Body).Decode(res); err != nil {
 		return nil, err
 	}
