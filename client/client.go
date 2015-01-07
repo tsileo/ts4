@@ -9,6 +9,7 @@ package ts4
 import (
 	"bytes"
 	"crypto/sha1"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -42,11 +43,54 @@ type BlobInfo struct {
 	Time string `json:"time"`
 }
 
-// Query send all blobs from start to end over the blobs channel
+// Query send all blobs from start to end over the blobs channel,
+// start default to 0 and end to time.Now().UTC() if left empty.
 func (bs *BlobStore) Query(start, end string, blobs chan<- []byte) error {
 	//TODO(tsileo)
 	// In a for loop decode json from /blobs into []*BlobInfo
 	// and send them over the channel, make as many requests as necessary under the hood
+	for {
+		res, err := bs.query(start, end)
+		if err != nil {
+			return err
+		}
+		if len(res) == 0 {
+			break
+		}
+		for _, blobinfo := range res {
+			start = blobinfo.Time
+			blob, err := bs.Get(blobinfo.Hash)
+			if err != nil {
+				return err
+			}
+			blobs <- blob
+		}
+	}
+	return nil
+}
+
+func (bs *BlobStore) query(start, end string) ([]*BlobInfo, error) {
+	request, err := http.NewRequest("GET", bs.ServerAddr+"/blobs?start="+start+"&end="+end, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := bs.client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	res := []*BlobInfo{}
+	if err := json.NewDecoder(resp.Body).Decode(res); err != nil {
+		return nil, err
+	}
+	switch {
+	case resp.StatusCode == 200:
+		return res, nil
+	case resp.StatusCode == 404:
+		return nil, ErrBlobNotFound
+	default:
+		return nil, fmt.Errorf("failed to query blobs")
+	}
 }
 
 // Get fetch the given blob.
