@@ -4,6 +4,10 @@ A blob store backed by S3 and indexed by SimpleDB accessible via a simple HTTP A
 
 Backup a stream of blobs and retrieve it in chronological order.
 
+## Client
+
+A go client is available, see [godoc reference](https://godoc.org/github.com/tsileo/ts4/client).
+
 ## API
 
 ### /api/upload
@@ -38,6 +42,11 @@ The time attributed is sorted lexicographically so any subset of time.RFC3339Nan
     		"end": "2015-01-06T23:23:12.069583002Z", 
     		"start": "2015-01"
 	}
+
+## Build with Docker
+
+	$ sudo docker build -t tsileo/ts4 .
+	$ sudo docker run -p 8010:8010 -e AWS_ACCESS_KEY=accesskey -e AWS_SECRET_KEY=secrekey -e TS4_S3_BUCKET=yourbucket -e TS4_SDB_DOMAIN=yourdomain tsileo/ts4
 
 ## License
 
