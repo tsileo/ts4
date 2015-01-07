@@ -43,6 +43,17 @@ The time attributed is sorted lexicographically so any subset of time.RFC3339Nan
     		"start": "2015-01"
 	}
 
+### /_stats
+
+	$ curl http://localhost:8010/_stats
+	{
+	    "blobs_count": "5", 
+	    "s3_bucket": "thomassileots411", 
+	    "sdb_domain": "thomassileots411", 
+	    "started_at": "2015-01-08T00:08:43+01:00", 
+	    "version": "0.0.0"
+	}
+
 ## Build with Docker
 
 	$ sudo docker build -t tsileo/ts4 .
