@@ -25,6 +25,7 @@ var (
 	bucket    *ls3.Bucket
 	sdbDomain string
 	s3Bucket  string
+	startedAt string
 )
 
 var version = "0.0.0"
@@ -52,6 +53,23 @@ func blobHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(blob)
 
+}
+func statsHandler(w http.ResponseWriter, r *http.Request) {
+	query, err := sdb.Select(fmt.Sprintf("SELECT COUNT(*) FROM %v", sdbDomain), false)
+	if err != nil {
+		log.Printf("err:%v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	i := query.Items[0]
+	cnt := i.Attrs[0].Value
+	WriteJSON(w, map[string]interface{}{
+		"blobs_count": cnt,
+		"version":     version,
+		"started_at":  startedAt,
+		"s3_bucket":   s3Bucket,
+		"sdb_domain":  sdbDomain,
+	})
 }
 func blobsHandler(w http.ResponseWriter, r *http.Request) {
 	start := r.URL.Query().Get("start")
@@ -129,6 +147,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	startedAt = time.Now().Format(time.RFC3339)
 	auth, err := aws.EnvAuth()
 	if err != nil {
 		panic(err)
@@ -156,8 +175,9 @@ func main() {
 	r.Handle("/api/blobs", handlers.LoggingHandler(os.Stdout, http.HandlerFunc(blobsHandler)))
 	r.Handle("/api/blob/{hash}", handlers.LoggingHandler(os.Stdout, http.HandlerFunc(blobHandler)))
 	r.Handle("/api/upload", handlers.LoggingHandler(os.Stdout, http.HandlerFunc(uploadHandler)))
+	r.Handle("/_stats", handlers.LoggingHandler(os.Stdout, http.HandlerFunc(statsHandler)))
 	http.Handle("/", r)
 	log.Printf("Starting ts4 version %v; %v (%v/%v)", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	log.Printf("Listening on port 8010")
-	http.ListenAndServe(":8010", nil)
+	http.ListenAndServe(":8011", nil)
 }
