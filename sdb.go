@@ -8,20 +8,26 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 	"time"
 
 	"github.com/goamz/goamz/aws"
 	lsdb "github.com/goamz/goamz/exp/sdb"
 	ls3 "github.com/goamz/goamz/s3"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
 var (
-	sdb    *lsdb.SDB
-	domain *lsdb.Domain
-	bucket *ls3.Bucket
+	sdb       *lsdb.SDB
+	domain    *lsdb.Domain
+	bucket    *ls3.Bucket
+	sdbDomain string
+	s3Bucket  string
 )
+
+var version = "0.0.0"
 
 func addSlash(s string) string {
 	return s[0:2] + "/" + s[2:40]
@@ -56,7 +62,7 @@ func blobsHandler(w http.ResponseWriter, r *http.Request) {
 	if end == "" {
 		end = time.Now().UTC().Format(time.RFC3339Nano)
 	}
-	query, err := sdb.Select(fmt.Sprintf("SELECT * FROM s3indextest4 where time > '%s' and time <= '%s' order by time asc", start, end), false)
+	query, err := sdb.Select(fmt.Sprintf("SELECT * FROM %v where time > '%s' and time <= '%s' order by time asc", sdbDomain, start, end), false)
 	if err != nil {
 		log.Printf("err:%v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -127,22 +133,31 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	sdbDomain = os.Getenv("TS4_SDB_DOMAIN")
+	if sdbDomain == "" {
+		panic("TS4_SDB_DOMAIN not set")
+	}
+	s3Bucket = os.Getenv("TS4_S3_BUCKET")
+	if s3Bucket == "" {
+		panic("TS4_S3_BUCKET not set")
+	}
 	sdb = lsdb.New(auth, aws.USEast)
 	s3 := ls3.New(auth, aws.USEast)
-	// TODO env variable for domain and bucket and dont forget to update the select
-	domain = sdb.Domain("s3indextest4")
+	domain = sdb.Domain(sdbDomain)
 	if _, err := domain.CreateDomain(); err != nil {
 		panic(err)
 	}
-	bucket = s3.Bucket("thomassileo.s3indextexst2")
+	bucket = s3.Bucket(s3Bucket)
 	if err := bucket.PutBucket(ls3.Private); err != nil {
 		panic(err)
 	}
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	r := mux.NewRouter()
-	r.HandleFunc("/api/blobs", blobsHandler)
-	r.HandleFunc("/api/blob/{hash}", blobHandler)
-	r.HandleFunc("/api/upload", uploadHandler)
+	r.Handle("/api/blobs", handlers.LoggingHandler(os.Stdout, http.HandlerFunc(blobsHandler)))
+	r.Handle("/api/blob/{hash}", handlers.LoggingHandler(os.Stdout, http.HandlerFunc(blobHandler)))
+	r.Handle("/api/upload", handlers.LoggingHandler(os.Stdout, http.HandlerFunc(uploadHandler)))
 	http.Handle("/", r)
+	log.Printf("Starting ts4 version %v; %v (%v/%v)", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	log.Printf("Listening on port 8010")
 	http.ListenAndServe(":8010", nil)
 }
