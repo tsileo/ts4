@@ -2,7 +2,7 @@
 
 A blob store backed by S3 and indexed by SimpleDB accessible via a simple HTTP API.
 
-Backup a stream of JSON message as blob and allow replay in chronological order.
+Backup a stream of blobs and retrieve it in chronological order.
 
 ## API
 
@@ -30,10 +30,10 @@ The time attributed is sorted lexicographically so any subset of time.RFC3339Nan
 	$ curl http://localhost:8010/api/blobs?start=2015-01
 	{
     		"data": [
-        	{
-        	    "name": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d", 
+        	  {
+        	    "hash": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d", 
         	    "time": "2015-01-06T23:21:47.718317501Z"
-        	}
+        	  }
     		], 
     		"end": "2015-01-06T23:23:12.069583002Z", 
     		"start": "2015-01"
