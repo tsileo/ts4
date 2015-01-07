@@ -52,6 +52,7 @@ type QueryResp struct {
 // Iter sends all blobs from start to end over the blobs channel,
 // start default to 0 and end to time.Now().UTC() if left empty.
 func (bs *BlobStore) Iter(start, end string, blobs chan<- []byte) error {
+	defer close(blobs)
 	for {
 		res, err := bs.Query(start, end)
 		if err != nil {
@@ -75,7 +76,7 @@ func (bs *BlobStore) Iter(start, end string, blobs chan<- []byte) error {
 // Query returns a QueryResp containing blobs hash and time.
 // start default to 0 and end to time.Now().UTC() if left empty.
 func (bs *BlobStore) Query(start, end string) (*QueryResp, error) {
-	request, err := http.NewRequest("GET", bs.ServerAddr+"/blobs?start="+start+"&end="+end, nil)
+	request, err := http.NewRequest("GET", bs.ServerAddr+"/api/blobs?start="+start+"&end="+end, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +101,7 @@ func (bs *BlobStore) Query(start, end string) (*QueryResp, error) {
 
 // Get fetch the given blob.
 func (bs *BlobStore) Get(hash string) ([]byte, error) {
-	request, err := http.NewRequest("GET", bs.ServerAddr+"/blob/"+hash, nil)
+	request, err := http.NewRequest("GET", bs.ServerAddr+"/api/blob/"+hash, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -124,33 +125,34 @@ func (bs *BlobStore) Get(hash string) ([]byte, error) {
 }
 
 // Put upload the given blob
-func (bs *BlobStore) Put(blob []byte) error {
+func (bs *BlobStore) Put(blob []byte) (string, error) {
 	hash := fmt.Sprintf("%x", sha1.Sum(blob))
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile(hash, hash)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if _, err := part.Write(blob); err != nil {
-		return err
+		return "", err
 	}
 	if err := writer.Close(); err != nil {
-		return err
+		return "", err
 	}
-	request, err := http.NewRequest("POST", bs.ServerAddr+"/upload", body)
+	request, err := http.NewRequest("POST", bs.ServerAddr+"/api/upload", body)
 	if err != nil {
-		return err
+		return "", err
 	}
+	request.Header.Add("Content-Type", writer.FormDataContentType())
 	resp, err := bs.client.Do(request)
 	if err != nil {
-		return err
+		return "", err
 	}
 	body.Reset()
 	body.ReadFrom(resp.Body)
 	resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("failed to put blob %v", body.String())
+		return "", fmt.Errorf("failed to put blob %v", body.String())
 	}
-	return nil
+	return hash, nil
 }
