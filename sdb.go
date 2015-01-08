@@ -171,12 +171,15 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				var prevSize int
 				if len(attrs.Attrs) != 0 {
 					prevSize, _ = strconv.Atoi(attrs.Attrs[0].Value)
+					update.Replace("size", strconv.Itoa(prevSize+len(blob)))
 					update.IfValue("size", strconv.Itoa(prevSize))
+				} else {
+					update.Add("size", strconv.Itoa(prevSize+len(blob)))
 				}
-				update.Add("size", strconv.Itoa(prevSize+len(blob)))
-				if _, err := sizeCounter.PutAttrs(update); err == nil {
-					break
+				if _, err := sizeCounter.PutAttrs(update); err != nil {
+					continue
 				}
+				break
 			}
 		}
 	default:
