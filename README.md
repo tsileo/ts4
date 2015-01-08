@@ -1,8 +1,8 @@
 # ts4: time series simple storage service
 
-A blob store backed by S3 and indexed by SimpleDB accessible via a simple HTTP API.
+A content-addressed blob store backed by S3, indexed by upload time (in SimpleDB) accessible via a simple HTTP API.
 
-Backup a stream of blobs and retrieve it in chronological order.
+Initially designed to backup and replay SQS messages in chronological order.
 
 ## Client
 
@@ -47,9 +47,10 @@ The time attributed is sorted lexicographically so any subset of time.RFC3339Nan
 
 	$ curl http://localhost:8010/_stats
 	{
-	    "blobs_count": "5", 
-	    "s3_bucket": "thomassileots411", 
-	    "sdb_domain": "thomassileots411", 
+	    "blob_count": "5", 
+	    "blob_size": "534", 
+	    "s3_bucket": "mybucket", 
+	    "sdb_domain": "mydomain", 
 	    "started_at": "2015-01-08T00:08:43+01:00", 
 	    "version": "0.0.0"
 	}
