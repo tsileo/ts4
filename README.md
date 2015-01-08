@@ -33,7 +33,7 @@ The time attributed is sorted lexicographically so any subset of time.RFC3339Nan
 
 	$ curl http://localhost:8010/api/blobs?start=2015-01
 	{
-    		"data": [
+    		"blobs": [
         	  {
         	    "hash": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d", 
         	    "time": "2015-01-06T23:21:47.718317501Z"
