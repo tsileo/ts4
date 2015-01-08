@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
@@ -33,6 +34,20 @@ var version = "0.0.0"
 
 func addSlash(s string) string {
 	return s[0:2] + "/" + s[2:40]
+}
+
+// newUUID generates a random UUID according to RFC 4122
+func newUUID() (string, error) {
+	uuid := make([]byte, 16)
+	n, err := io.ReadFull(rand.Reader, uuid)
+	if n != len(uuid) || err != nil {
+		return "", err
+	}
+	// variant bits; see section 4.1.1
+	uuid[8] = uuid[8]&^0xc0 | 0x80
+	// version 4 (pseudo-random); see section 4.1.3
+	uuid[6] = uuid[6]&^0xf0 | 0x40
+	return fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:]), nil
 }
 
 func WriteJSON(w http.ResponseWriter, data interface{}) {
@@ -144,6 +159,15 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			item := domain.Item(hash)
 			pa := &lsdb.PutAttrs{}
+			itemAttrs, err := item.Attrs(nil, false)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if len(itemAttrs.Attrs) != 0 {
+				// the blob is already indexed
+				return
+			}
 			pa.Add("time", time.Now().UTC().Format(time.RFC3339Nano))
 			if _, err := item.PutAttrs(pa); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -205,5 +229,5 @@ func main() {
 	http.Handle("/", r)
 	log.Printf("Starting ts4 version %v; %v (%v/%v)", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	log.Printf("Listening on port 8010")
-	http.ListenAndServe(":8011", nil)
+	http.ListenAndServe(":8010", nil)
 }
