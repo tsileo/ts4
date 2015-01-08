@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/goamz/goamz/aws"
@@ -52,7 +53,6 @@ func blobHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(blob)
-
 }
 func statsHandler(w http.ResponseWriter, r *http.Request) {
 	query, err := sdb.Select(fmt.Sprintf("SELECT COUNT(*) FROM %v", sdbDomain), false)
@@ -62,13 +62,22 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	i := query.Items[0]
-	cnt := i.Attrs[0].Value
+	cnt, _ := strconv.Atoi(i.Attrs[0].Value)
+	sizeCounter := domain.Item("size")
+	attrs, err := sizeCounter.Attrs(nil, false)
+	if err != nil {
+		log.Printf("err:%v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	size, _ := strconv.Atoi(attrs.Attrs[0].Value)
 	WriteJSON(w, map[string]interface{}{
-		"blobs_count": cnt,
-		"version":     version,
-		"started_at":  startedAt,
-		"s3_bucket":   s3Bucket,
-		"sdb_domain":  sdbDomain,
+		"blob_count": cnt - 1,
+		"blob_size":  size,
+		"version":    version,
+		"started_at": startedAt,
+		"s3_bucket":  s3Bucket,
+		"sdb_domain": sdbDomain,
 	})
 }
 func blobsHandler(w http.ResponseWriter, r *http.Request) {
@@ -140,6 +149,23 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			sizeCounter := domain.Item("size")
+			for {
+				attrs, err := sizeCounter.Attrs(nil, true)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+				update := &lsdb.PutAttrs{}
+				var prevSize int
+				if len(attrs.Attrs) != 0 {
+					prevSize, _ = strconv.Atoi(attrs.Attrs[0].Value)
+					update.IfValue("size", strconv.Itoa(prevSize))
+				}
+				update.Add("size", strconv.Itoa(prevSize+len(blob)))
+				if _, err := sizeCounter.PutAttrs(update); err == nil {
+					break
+				}
+			}
 		}
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -179,5 +205,5 @@ func main() {
 	http.Handle("/", r)
 	log.Printf("Starting ts4 version %v; %v (%v/%v)", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	log.Printf("Listening on port 8010")
-	http.ListenAndServe(":8010", nil)
+	http.ListenAndServe(":8011", nil)
 }
