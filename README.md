@@ -4,17 +4,27 @@ A content-addressed blob store backed by S3, indexed by upload time (in SimpleDB
 
 Initially designed to backup and replay SQS messages in chronological order.
 
+Blobs will be stored in the specified bucket with sha1 as name and paritioned using the two first characters of the key (e.g. aa/f4c61ddcc5e8a2dabede0f3b482cd9aea9434d for aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d).
+
+The only way to query the time series is by time range.
+
 ## Client
 
 A go client is available, see [godoc reference](https://godoc.org/github.com/tsileo/ts4/client).
 
-## API
+[ts4tosqs](https://github.com/tsileo/ts4tosqs) is built with the go client.
+
+## HTTP API
 
 ### /api/upload
 
 A multipart/form-data endpoint, sha1 of the blob must be computed and used as name.
 
 	$ curl -v -include  --form aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d=hello http://localhost:8010/api/upload	
+
+The default indexed time is the received time. 
+
+TODO: a header to override the indexed time.
 
 ### /api/blob/{hash}
 
