@@ -6,7 +6,7 @@ Initially designed to backup and replay SQS messages in chronological order.
 
 Blobs will be stored in the specified bucket with sha1 as name and paritioned using the two first characters of the key (e.g. aa/f4c61ddcc5e8a2dabede0f3b482cd9aea9434d for aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d).
 
-The only way to query the time series is by time range.
+The only way to query the time series is using time range.
 
 ## Client
 
@@ -52,6 +52,8 @@ The time attributed is sorted lexicographically so any subset of time.RFC3339Nan
     		"end": "2015-01-06T23:23:12.069583002Z", 
     		"start": "2015-01"
 	}
+
+In the response, **start** and **end** reflect the URL query, to iterate over all blobs, you have to use the latest blob **time** and use it as **start** for the next query.
 
 ### /_stats
 

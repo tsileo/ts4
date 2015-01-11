@@ -219,6 +219,6 @@ func main() {
 	r.Handle("/_stats", handlers.LoggingHandler(os.Stdout, http.HandlerFunc(statsHandler)))
 	http.Handle("/", r)
 	log.Printf("Starting ts4 version %v; %v (%v/%v)", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
-	log.Printf("Listening on port 8010")
+	log.Printf("HTTP API Listening on port 8010")
 	http.ListenAndServe(":8010", nil)
 }
